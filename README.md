@@ -1,62 +1,92 @@
 # Hybrid-Neural-Network-and-NLLS-Fit-Approach-for-Polarization-Curve-Parameters-Estimation
 
-These scripts are written and performed in Python 3.13.7
+This repository contains Python scripts for generating, training, and applying **Neural Network (CNN + LSTM)** models to estimate the parameters of **polarization curves** in Zinc-Air Flow Batteries (ZAFBs). The goal is to accurately estimate the following parameters from experimental or synthetic data:
+
+- $E_0$ → equilibrium potential  
+- $b$ → Tafel slope  
+- $i_0$ → exchange current density  
+- $R$ → ohmic resistance  
+- $i_L$ → limiting current density  
+
+---
+
+## Repository Overview
 
 This repository contains scripts for:
-•	Generating synthetic polarization curve datasets → 1_NN_dataset_creation.py: creates two datasets curves_with_iL and curves_without_iL, and respective parameter files (params_with_iL and params_without_iL)
-•	Training Neural Networks (CNN + LSTM) to estimate parameters → 2A_NN_with_iL_CNN+LSTM.py and 2B_NN_without_iL_CNN+LSTM.py, for the respective datasets
-•	Applying a hybrid Neural Network + Nonlinear Least Squares (NLLS) method to experimental data → 3_param_estimation_NN+NLLS.py
-The goal is to estimate the parameters of a polarization curve:
-E0 → equilibrium potential
-b → Tafel slope
-i0 → exchange current density
-R → ohmic resistance
-iL → limiting current density
 
+1. **Generating synthetic polarization curve datasets**  
+   - `1_NN_dataset_creation.py` creates two datasets: `curves_with_iL` and `curves_without_iL`, along with the corresponding parameter files (`params_with_iL` and `params_without_iL`).  
 
-FILES DESCRIPTION:
-1_NN_dataset_creation.py
-This script generates a large synthetic dataset of polarization curves using the analytical model, generating all combinations of parameters and truncating curves when voltage reaches 0.2 V. The primary dataset is saved in:
-•	curves_n.npy → current–voltage curves
-•	params_n.npy → corresponding parameters
-The script also splits the dataset using the first derivative into:
-•	curves_with_iL_n.npy
-•	curves_without_iL_n.npy
-•	corresponding parameter files
-This allows training separate neural networks depending on whether the mass transport limitation is visible or not.
+2. **Training Neural Networks (CNN + LSTM) to estimate parameters**  
+   - `2A_NN_with_iL_CNN+LSTM.py` → trains on curves **with mass transport limitation** (including $i_L$).  
+   - `2B_NN_without_iL_CNN+LSTM.py` → trains on curves **without mass transport limitation** (excluding $i_L$).  
 
+3. **Applying a hybrid Neural Network + Nonlinear Least Squares (NLLS) method to experimental data**  
+   - `3_param_estimation_NN+NLLS.py` → predicts parameters from experimental polarization curves using a trained NN and refines them via NLLS fitting.  
 
+---
 
-2A_NN_with_iL_CNN+LSTM.py
-Trains a Neural Network to estimate the 5 parameters for curves that include limiting current effects, with a hybrid CNN+LSTM architecture. The NN minimizes MSE, monitors R² (global and per parameter), and evaluates performance on the test set.
+## File Descriptions
 
-2B_NN_without_iL_CNN+LSTM.py
-Same as 2A, but trained on curves without limiting current effect (iL not included).
+### `1_NN_dataset_creation.py`
+- Generates a large synthetic dataset of polarization curves using an analytical model.  
+- Curves are truncated when voltage reaches 0.2 V.  
+- Saves datasets in `.npy` format:  
+  - `curves_n.npy` → full current–voltage curves  
+  - `params_n.npy` → corresponding parameters  
+- Further splits curves based on the derivative to separate mass transport effects:  
+  - `curves_with_iL_n.npy` / `params_with_iL_n.npy`  
+  - `curves_without_iL_n.npy` / `params_without_iL_n.npy`  
 
+This allows training **separate NNs** depending on whether the **mass transport limitation** is present.
 
+---
 
-3_param_estimation_NN+NLLS.py
-This script applies the previously trained CNN-LSTM model to experimental polarization curves and refines the estimates via NLLS fitting.
-Workflow:
-1.	Load experimental curve – Current-voltage data is read from a text file.
-2.	Detect mass transport limitation – Based on the derivative of potential vs. current:
-	o	J = 1: mass transport limitation detected → model includes iL;
-	o	J = 0: no mass transport limitation → model excludes iL.
-3.	Load the appropriate NN model – Either trained with or without iL.
-4.	NN parameter prediction – Predict normalized parameters and denormalize them to obtain physical values.
-5.	Post-processing for iL (only if mass transport detected).
-6.	NN+NLLS refinement – Use NN (and post-processed) estimates as initial guesses in NLLS to refine all parameters.
-7.	Confidence intervals and R² – Report 95% confidence intervals and compute the coefficient of determination between experimental and fitted curves.
+### `2A_NN_with_iL_CNN+LSTM.py`
+- Trains a CNN+LSTM neural network to estimate all **5 parameters** on curves that **include limiting current effects**.  
+- Minimizes **MSE loss**, monitors $R^2$ globally and per parameter, and evaluates performance on a test set.
 
+### `2B_NN_without_iL_CNN+LSTM.py`
+- Same as `2A`, but for curves **without limiting current** ($i_L$ not included).  
 
+---
 
-WORKFLOW:
-Run 1_NN_dataset_creation.py → Train NN using 2A or 2B → Use 3_param_estimation_NN+NLLS.py for experimental parameter estimation.
+### `3_param_estimation_NN+NLLS.py`
+- Applies a **trained CNN-LSTM model** to **experimental polarization curves**, then refines estimates with NLLS.  
 
+**Workflow:**
+1. Load experimental curve from a `.txt` file.  
+2. Detect mass transport limitation via derivative of potential vs. current:  
+   - `J = 1` → mass transport limitation detected → use NN trained **with $i_L$**  
+   - `J = 0` → no mass transport limitation → use NN trained **without $i_L$**  
+3. Predict parameters with the appropriate NN and denormalize to physical values.  
+4. If $i_L$ is present, perform post-processing.  
+5. Refine all parameters using **NN + NLLS**.  
+6. Compute **95% confidence intervals** and $R^2$ between experimental and fitted curves.
 
+---
 
-FILE ATTACHED:
-Together with the scripts there are:
-1.	All the .npy and .npz datasets created with 5 values per parameter, already splitted in the two datasets
-2.	Two NN example models for both datasets, created with 5 values per parameter ---> CNN_LSTM_noregu_5val_withiL.keras and CNN_LSTM_noregu_5val_withoutiL.keras
-3	Two examples of experimental curves: one with mass transport effect (curve1.txt) and one without (curve2.txt)
+## Workflow
+
+1. Run `1_NN_dataset_creation.py` → generate synthetic datasets.  
+2. Train the neural network using either `2A` (with $i_L$) or `2B` (without $i_L$).  
+3. Use `3_param_estimation_NN+NLLS.py` to estimate parameters from experimental curves.  
+
+---
+
+## Included Files
+
+- **Datasets**: `.npy` and `.npz` files with synthetic curves and parameters (5 values per parameter).  
+- **Trained NN Models**:  
+  - `CNN_LSTM_noregu_5val_withiL.keras`  
+  - `CNN_LSTM_noregu_5val_withoutiL.keras`  
+- **Example experimental curves**:  
+  - `curve1.txt` → with mass transport limitation  
+  - `curve2.txt` → without mass transport limitation  
+
+---
+
+## Requirements
+
+- Python 3.13.7  
+- `numpy`, `scipy`, `tensorflow` (for CNN + LSTM), `matplotlib` (for plotting, optional)  
